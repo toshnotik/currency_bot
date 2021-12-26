@@ -1,21 +1,8 @@
-import requests
-import json
 import telebot
-
-
-TOKEN = '5054117549:AAEXxyXJZowBLlrqu8DI6YJx0pp1MNHJKq4'
+from config import keys, TOKEN
+from utilits import ConvertionExeption, CurrencyConvert
 
 bot = telebot.TeleBot(TOKEN)
-
-keys = {
-    'евро': 'EUR',
-    'доллар': 'USD',
-    'рубль': 'RUB',
-}
-
-class ConvertionExeption(Exception):
-    pass
-
 
 @bot.message_handler(commands=['start', 'help'])
 def help(message: telebot.types.Message):
@@ -33,36 +20,23 @@ def values(message: telebot.types.Message):
 
 @bot.message_handler(content_types=['text', ])
 def convert(message: telebot.types.Message):
-    values = message.text.split(' ')
-
-    if len(values) != 3:
-        raise ConvertionExeption('Запрос введен не корректно.')
-
-    amount, quote, base = values
-
-    if quote == base:
-        raise ConvertionExeption(f'Вы ввели одинаковую валюту.')
-
     try:
-        quote_tiker = keys[quote]
-    except KeyError:
-        raise ConvertionExeption(f'Не удалось обработать валюту {quote}')
+        values = message.text.split(' ')
 
-    try:
-        base_tiker = keys[base]
-    except KeyError:
-        raise ConvertionExeption(f'Не удалось обработать валюту {base}')
+        if len(values) != 3:
+            raise ConvertionExeption('Запрос введен не корректно.')
 
-    try:
-        amount = float(amount)
-    except ValueError:
-        raise ConvertionExeption(f'Не удалось обработать колличество {amount}')
+        amount, quote, base = values
+        total = CurrencyConvert.convert(quote, base, amount)
+    except ConvertionExeption as e:
+        bot.reply_to(message, f'Ошибка пользователя.\n{e}')
 
-    r = requests.get(f'https://min-api.cryptocompare.com/data/price?fsym={quote_tiker}&tsyms={base_tiker}')
-    total_base = json.loads(r.content)[keys[base]]
-    total = total_base * float(amount)
-    text = f'Цена {amount} {quote} в {base} - {total}'
-    bot.send_message(message.chat.id, text)
+    except Exception as e:
+        bot.reply_to(message, f'Не удалось обработать команду\n{e}')
+    else:
+        text = f'Цена {amount} {quote} в {base} = {total}'
+        bot.send_message(message.chat.id, text)
+
 
 
 bot.polling(none_stop=True)
